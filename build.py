@@ -26,9 +26,7 @@ if 'CONDA_PREFIX' in os.environ:
 else:
     PREFIX = sys.prefix
 
-IS_ANACONDA =  ('conda' in sys.version or
-                'anaconda' in sys.prefix.lower() or
-                'CONDA_PREFIX' in os.environ)
+IS_ANACONDA = os.path.exists(os.path.join(sys.prefix, 'conda-meta'))
 
 def get_makefile():
     """Get the Makefile for the system"""
