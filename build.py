@@ -27,7 +27,7 @@ else:
     PREFIX = sys.prefix
 
 IS_ANACONDA =  ('conda' in sys.version or
-                'anaconda' in sys.prefix or
+                'anaconda' in sys.prefix.lower() or
                 'CONDA_PREFIX' in os.environ)
 
 def get_makefile():
