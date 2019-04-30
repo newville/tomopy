@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 
 # #########################################################################
-# Copyright (c) 2015-2019, UChicago Argonne, LLC. All rights reserved.    #
+# Copyright (c) 2019, UChicago Argonne, LLC. All rights reserved.         #
 #                                                                         #
-# Copyright 2015-2019. UChicago Argonne, LLC. This software was produced  #
+# Copyright 2019. UChicago Argonne, LLC. This software was produced       #
 # under U.S. Government contract DE-AC02-06CH11357 for Argonne National   #
 # Laboratory (ANL), which is operated by UChicago Argonne, LLC for the    #
 # U.S. Department of Energy. The U.S. Government has rights to use,       #
@@ -46,37 +46,109 @@
 # POSSIBILITY OF SUCH DAMAGE.                                             #
 # #########################################################################
 
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
-
 import numpy as np
-import os.path
-from numpy.testing import assert_array_almost_equal
+import scipy
+import logging
+
+logger = logging.getLogger(__name__)
 
 
-__author__ = "Doga Gursoy"
-__copyright__ = "Copyright (c) 2015, UChicago Argonne, LLC."
-__docformat__ = 'restructuredtext en'
+__author__ = "Chen Zhang"
+__all__ = ['gauss1d',
+           'discrete_cdf',
+           'calc_affine_transform',
+           ]
 
 
-def read_file(fname):
+def gauss1d(x, *p):
     """
-    Read numpy array from file in data folder.
+    1D Gaussian function used for curve fitting.
+
+    Parameters
+    ----------
+    x  :  np.ndarray
+        1D array for curve fitting
+    p  :  parameter lis t
+        magnitude, center, std = p
+
+    Returns
+    -------
+    1d Gaussian distribution evaluted at x with p
     """
-    test_dir = os.path.dirname(os.path.realpath(__file__))
-    return np.load(os.path.join(test_dir, 'test_data', fname))
+    A, mu, sigma = p
+    return A * np.exp(-(x - mu)**2 / (2. * sigma**2))
 
 
-def write_file(fname, arr):
+def discrete_cdf(data, steps=None):
     """
-    Write numpy array to file in data folder.
-    """
-    test_dir = os.path.dirname(os.path.realpath(__file__))
-    return np.save(os.path.join(test_dir, 'test_data', fname), arr)
-    
+    Calculate CDF of given data without discrete binning to avoid unnecessary
+    skew of distribution.
 
-def loop_dim(func, data):
-    for m in range(3):
-        assert_array_almost_equal(
-            func(data, axis=m),
-            read_file(str(func.__name__) + '_' + str(m) + '.npy'))
+    The default steps (None) will use the whole data. In other words, it is 
+    close to considering using bin_size=1 or bins=len(data).
+
+    Parameters
+    ----------
+    data  :  np.ndarray
+        1-D numpy array
+    steps :  [ None | int ], optional
+        Number of elements in the returning array
+
+    Returns
+    -------
+    pltX  : np.ndarray
+        Data along x (data) direction
+    pltY  : np.ndarray
+        Data along y (density) direction
+    """
+    x = np.sort(data)
+
+    # check if list is empty
+    if len(x) == 0:
+        return [], []
+
+    # subsamping if steps is specified and the number is smaller than the
+    # total lenght of x
+    if (steps is not None) and len(x) > steps:
+        x = x[np.arange(0, len(x), int(np.ceil(len(x) / steps)))]
+
+    # calculate the cumulative density
+    xx = np.tile(x, (2, 1)).flatten(order='F')
+    y = np.arange(len(x))
+    yy = np.vstack((y, y + 1)).flatten(order='F') / float(y[-1])
+
+    return xx, yy
+
+
+def calc_affine_transform(pts_source, pts_target):
+    """
+    Use least square regression to calculate the 2D affine transformation
+    matrix (3x3, rot&trans) based on given set of (marker) points.
+                            pts_source -> pts_target
+
+    Parameters
+    ----------
+    pts_source  :  np.2darray
+        source points with dimension of (n, 2) where n is the number of
+        marker points
+    pts_target  :  np.2darray
+        target points where
+                F(pts_source) = pts_target
+    Returns
+    -------
+    np.2darray
+        A 3x3 2D affine transformation matrix
+          | r_11  r_12  tx |    | x1 x2 ...xn |   | x1' x2' ...xn' |
+          | r_21  r_22  ty | *  | y1 y2 ...yn | = | y1' y2' ...yn' |
+          |  0     0     1 |    |  1  1 ... 1 |   |  1   1  ... 1  |
+        where r_ij represents the rotation and t_k represents the translation
+    """
+    # augment data with padding to include translation
+    def pad(x): return np.hstack([x, np.ones((x.shape[0], 1))])
+
+    # NOTE:
+    #   scipy affine_transform performs as np.dot(m, vec),
+    #   therefore we need to transpose the matrix here
+    #   to get the correct rotation
+
+    return scipy.linalg.lstsq(pad(pts_source), pad(pts_target))[0].T
