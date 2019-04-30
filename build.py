@@ -26,6 +26,10 @@ if 'CONDA_PREFIX' in os.environ:
 else:
     PREFIX = sys.prefix
 
+IS_ANACONDA =  ('conda' in sys.version or
+                'anaconda' in sys.prefix or
+                'CONDA_PREFIX' in os.environ)
+
 def get_makefile():
     """Get the Makefile for the system"""
     if sys.platform.lower().startswith('win'):
@@ -63,7 +67,10 @@ def build_libtomopy(install_prefix='.'):
 
     src  = os.path.abspath(os.path.join("..", 'tomopy', 'sharedlibs', conf.sharedlib))
     dest = os.path.join(install_prefix, 'tomopy', 'sharedlibs', conf.sharedlib)
-    shutil.copy(src, dest)
+    try:
+       shutil.copy(src, dest)
+    except:
+       pass
     os.chmod(dest, 493) # chmod 755
 
 def clean_libtomopy(install_prefix='.'):
@@ -92,7 +99,7 @@ class Config:
         self.includes = [pjoin(os.path.dirname(os.getcwd()), 'include')]
         self.linklibs = ['%s' % pjoin(PREFIX, 'lib')]
         # anaconda compat?
-        if 'conda' in sys.version:
+        if IS_ANACONDA:
             compat = pjoin(PREFIX, 'compiler_compat')
             if os.path.exists(compat) and os.path.isdir(compat):
                 self.conda_compat = '-B %s' % compat
@@ -150,7 +157,7 @@ def config_windows(install_prefix):
     logger.info("Config for Windows")
     config = Config(install_prefix)
     compilerdir = None
-    if 'conda' in sys.version:
+    if IS_ANACONDA:
         # Look for GCC in the conda directory
         mingw_path = pjoin(PREFIX, 'MinGW', 'bin')
         mingw_gcc = pjoin(mingw_path, 'gcc.exe')
