@@ -50,6 +50,10 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
 __version__ = '1.4.0'
+import os
+# note: may need to set CONDA env *before* loading numpy!
+if os.name == 'nt':
+    os.environ['CONDA_DLL_SEARCH_MODIFICATION_ENABLE'] = '1'
 
 from ._fft_loader import fft_impl
 from tomopy.misc.corr import *
